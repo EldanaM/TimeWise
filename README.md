@@ -25,5 +25,5 @@ TimeWise помогает планировать задачи и анализи�
 
 ### 1. Клонируй репозиторий
 ```bash
-git clone https://github.com/твойник/timewise.git
+git clone https://github.com/EldanaM/timewise.git
 cd timewise
