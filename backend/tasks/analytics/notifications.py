@@ -1,5 +1,6 @@
 from django.db.models import Avg
 from ..models import Notification, TimeLog
+from .email_service import EmailService
 
 class NotificationService:
     @staticmethod
@@ -19,6 +20,17 @@ class NotificationService:
                 type='warning',
                 task=task
             )
+            EmailService.task_estimate_notification(task, request.user)
+            
+        elif task.estimated_time > avg_time * 1.5:
+            Notification.objects.create(
+                user=request.user,
+                message=f'Задача "{task.title}" оценена в {task.estimated_time} мин, '
+                       f'хотя обычно занимает {round(avg_time)} мин',
+                type='info',
+                task=task
+            )
+            EmailService.task_estimate_notification(task, request.user)
     
     @staticmethod
     def check_time_accuracy(timelog):
@@ -40,3 +52,4 @@ class NotificationService:
                 type=notif_type,
                 task=task
             )
+            EmailService.task_completed_notification(task, user, diff)

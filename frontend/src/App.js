@@ -1,27 +1,9 @@
 import React, { useState, useEffect } from 'react';
-
-const API_URL = 'http://127.0.0.1:8000/api';
-
-async function apiCall(url, method = 'GET', data = null) {
-  const options = {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-    }
-  };
-  
-  const token = localStorage.getItem('token');
-  if (token) {
-    options.headers.Authorization = `Token ${token}`;
-  }
-  
-  if (data) {
-    options.body = JSON.stringify(data);
-  }
-  
-  const response = await fetch(API_URL + url, options);
-  return await response.json();
-}
+import { 
+  login, register, getTasks, getCategories, createTask, deleteTask, completeTask,
+  createCategory, deleteCategory, getNotifications, markNotificationRead, 
+  markAllNotificationsRead, getDashboard 
+} from './api';
 
 function Login({ onLogin }) {
   const [username, setUsername] = useState('');
@@ -30,8 +12,8 @@ function Login({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = await apiCall('/users/login/', 'POST', { username, password });
-    if (data.token) {
+    const data = await login(username, password);
+    if (data && data.token) {
       localStorage.setItem('token', data.token);
       onLogin();
     } else {
@@ -42,18 +24,30 @@ function Login({ onLogin }) {
   return (
     <div className="container">
       <div className="card" style={{ maxWidth: '400px', margin: '50px auto' }}>
-        <h2 className="text-center">Вход</h2>
+        <h2 className="text-center">Вход в TimeWise</h2>
         {error && <p style={{color: 'red', textAlign: 'center'}}>{error}</p>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Имя пользователя</label>
-            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} required />
+            <input 
+              type="text" 
+              value={username} 
+              onChange={(e) => setUsername(e.target.value)} 
+              required 
+            />
           </div>
           <div className="form-group">
             <label>Пароль</label>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input 
+              type="password" 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              required 
+            />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Войти</button>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+            Войти
+          </button>
         </form>
         <p className="text-center mt-2">
           Нет аккаунта? <button className="btn" onClick={() => onLogin('register')}>Регистрация</button>
@@ -76,10 +70,10 @@ function Register({ onRegister }) {
       setError('Пароли не совпадают');
       return;
     }
-    const data = await apiCall('/users/register/', 'POST', { username, email, password, password2 });
-    if (data.user) {
-      const loginData = await apiCall('/users/login/', 'POST', { username, password });
-      if (loginData.token) {
+    const data = await register(username, email, password, password2);
+    if (data && data.user) {
+      const loginData = await login(username, password);
+      if (loginData && loginData.token) {
         localStorage.setItem('token', loginData.token);
         onRegister();
       }
@@ -110,7 +104,9 @@ function Register({ onRegister }) {
             <label>Повторите пароль</label>
             <input type="password" value={password2} onChange={(e) => setPassword2(e.target.value)} required />
           </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Зарегистрироваться</button>
+          <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+            Зарегистрироваться
+          </button>
         </form>
         <p className="text-center mt-2">
           Уже есть аккаунт? <button className="btn" onClick={() => onRegister('login')}>Вход</button>
@@ -128,42 +124,46 @@ function Tasks() {
   const [newTask, setNewTask] = useState({ title: '', category: '', estimated_time: 30 });
 
   useEffect(() => {
-    async function loadData() {
-      const tasksData = await apiCall('/tasks/tasks/');
-      const catsData = await apiCall('/tasks/categories/');
-      setTasks(tasksData);
-      setCategories(catsData);
-      setLoading(false);
-    }
     loadData();
   }, []);
 
-  const createTask = async () => {
-    await apiCall('/tasks/tasks/', 'POST', newTask);
-    setShowForm(false);
-    setNewTask({ title: '', category: '', estimated_time: 30 });
-    const tasksData = await apiCall('/tasks/tasks/');
-    setTasks(tasksData);
+  const loadData = async () => {
+    const tasksData = await getTasks();
+    const catsData = await getCategories();
+    setTasks(Array.isArray(tasksData) ? tasksData : []);
+    setCategories(Array.isArray(catsData) ? catsData : []);
+    setLoading(false);
   };
 
-  const deleteTask = async (id) => {
+  const handleCreateTask = async () => {
+    if (!newTask.title || !newTask.category) return;
+    await createTask({
+      title: newTask.title,
+      category: parseInt(newTask.category),
+      estimated_time: parseInt(newTask.estimated_time)
+    });
+    setShowForm(false);
+    setNewTask({ title: '', category: '', estimated_time: 30 });
+    loadData();
+  };
+
+  const handleDeleteTask = async (id) => {
     if (window.confirm('Удалить задачу?')) {
-      await apiCall(`/tasks/tasks/${id}/`, 'DELETE');
-      setTasks(tasks.filter(t => t.id !== id));
+      await deleteTask(id);
+      loadData();
     }
   };
 
-  const completeTask = async (id) => {
-    await apiCall(`/tasks/tasks/${id}/complete/`, 'POST', {});
-    const tasksData = await apiCall('/tasks/tasks/');
-    setTasks(tasksData);
+  const handleCompleteTask = async (id) => {
+    await completeTask(id);
+    loadData();
   };
 
   if (loading) return <div className="container">Загрузка...</div>;
 
   return (
     <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
         <h1>Мои задачи</h1>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? 'Отмена' : '+ Новая задача'}
@@ -171,29 +171,49 @@ function Tasks() {
       </div>
 
       {showForm && (
-        <div className="card">
+        <div className="card" style={{ marginBottom: '30px' }}>
           <h3>Новая задача</h3>
           <div className="form-group">
             <label>Название</label>
-            <input type="text" value={newTask.title} onChange={(e) => setNewTask({...newTask, title: e.target.value})} />
+            <input 
+              type="text" 
+              value={newTask.title} 
+              onChange={(e) => setNewTask({...newTask, title: e.target.value})} 
+            />
           </div>
           <div className="form-group">
             <label>Категория</label>
-            <select value={newTask.category} onChange={(e) => setNewTask({...newTask, category: e.target.value})}>
+            <select 
+              value={newTask.category} 
+              onChange={(e) => setNewTask({...newTask, category: e.target.value})}
+            >
               <option value="">Выберите категорию</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
             </select>
           </div>
           <div className="form-group">
             <label>Время (минут)</label>
-            <input type="number" value={newTask.estimated_time} onChange={(e) => setNewTask({...newTask, estimated_time: e.target.value})} />
+            <input 
+              type="number" 
+              value={newTask.estimated_time} 
+              onChange={(e) => setNewTask({...newTask, estimated_time: e.target.value})} 
+            />
           </div>
-          <button className="btn btn-success" onClick={createTask}>Создать</button>
+          <button className="btn btn-success" onClick={handleCreateTask}>
+            Создать задачу
+          </button>
         </div>
       )}
 
       {tasks.length === 0 ? (
-        <div className="card text-center">Нет задач. Создайте первую!</div>
+        <div className="card text-center">
+          <p>У вас пока нет задач</p>
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            Создать первую задачу
+          </button>
+        </div>
       ) : (
         tasks.map(task => (
           <div key={task.id} className={`card task-card ${task.is_completed ? 'completed' : ''}`}>
@@ -206,9 +226,19 @@ function Tasks() {
             </div>
             <div className="task-actions">
               {!task.is_completed && (
-                <button className="btn btn-success btn-small" onClick={() => completeTask(task.id)}>✓</button>
+                <button 
+                  className="btn btn-success btn-small" 
+                  onClick={() => handleCompleteTask(task.id)}
+                >
+                  ✓ Выполнить
+                </button>
               )}
-              <button className="btn btn-danger btn-small" onClick={() => deleteTask(task.id)}>×</button>
+              <button 
+                className="btn btn-danger btn-small" 
+                onClick={() => handleDeleteTask(task.id)}
+              >
+                × Удалить
+              </button>
             </div>
           </div>
         ))
@@ -220,43 +250,71 @@ function Tasks() {
 function Categories() {
   const [categories, setCategories] = useState([]);
   const [newName, setNewName] = useState('');
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    async function load() {
-      const data = await apiCall('/tasks/categories/');
-      setCategories(data);
-    }
-    load();
+    loadCategories();
   }, []);
 
-  const createCategory = async () => {
-    if (!newName) return;
-    await apiCall('/tasks/categories/', 'POST', { name: newName, color: '#4a90e2' });
-    setNewName('');
-    const data = await apiCall('/tasks/categories/');
-    setCategories(data);
+  const loadCategories = async () => {
+    const data = await getCategories();
+    setCategories(Array.isArray(data) ? data : []);
   };
 
-  const deleteCategory = async (id) => {
+  const handleCreateCategory = async () => {
+    if (!newName) return;
+    await createCategory(newName);
+    setNewName('');
+    setShowForm(false);
+    loadCategories();
+  };
+
+  const handleDeleteCategory = async (id) => {
     if (window.confirm('Удалить категорию?')) {
-      await apiCall(`/tasks/categories/${id}/`, 'DELETE');
-      setCategories(categories.filter(c => c.id !== id));
+      await deleteCategory(id);
+      loadCategories();
     }
   };
 
   return (
     <div className="container">
-      <h1>Категории</h1>
-      <div className="card" style={{ display: 'flex', gap: '10px' }}>
-        <input type="text" placeholder="Новая категория" value={newName} onChange={(e) => setNewName(e.target.value)} />
-        <button className="btn btn-primary" onClick={createCategory}>Добавить</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <h1>Категории</h1>
+        <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
+          {showForm ? 'Отмена' : '+ Новая категория'}
+        </button>
       </div>
+
+      {showForm && (
+        <div className="card" style={{ marginBottom: '30px' }}>
+          <h3>Новая категория</h3>
+          <div className="form-group">
+            <label>Название категории</label>
+            <input 
+              type="text" 
+              value={newName} 
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Например: Работа, Учеба, Спорт"
+            />
+          </div>
+          <button className="btn btn-success" onClick={handleCreateCategory}>
+            Создать категорию
+          </button>
+        </div>
+      )}
+
       <div className="stats-grid">
         {categories.map(cat => (
           <div key={cat.id} className="stat-card">
             <h3>{cat.name}</h3>
             <p>Задач: {cat.tasks_count || 0}</p>
-            <button className="btn btn-danger btn-small" onClick={() => deleteCategory(cat.id)}>Удалить</button>
+            <button 
+              className="btn btn-danger btn-small" 
+              onClick={() => handleDeleteCategory(cat.id)}
+              style={{ marginTop: '10px' }}
+            >
+              Удалить
+            </button>
           </div>
         ))}
       </div>
@@ -268,28 +326,50 @@ function Notifications() {
   const [notifications, setNotifications] = useState([]);
 
   useEffect(() => {
-    async function load() {
-      const data = await apiCall('/tasks/notifications/');
-      setNotifications(data);
-    }
-    load();
+    loadNotifications();
   }, []);
 
-  const markRead = async (id) => {
-    await apiCall(`/tasks/notifications/${id}/mark-read/`, 'POST', {});
-    setNotifications(notifications.map(n => n.id === id ? {...n, is_read: true} : n));
+  const loadNotifications = async () => {
+    const data = await getNotifications();
+    setNotifications(Array.isArray(data) ? data : []);
+  };
+
+  const handleMarkRead = async (id) => {
+    await markNotificationRead(id);
+    loadNotifications();
+  };
+
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsRead();
+    loadNotifications();
   };
 
   return (
     <div className="container">
-      <h1>Уведомления</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+        <h1>Уведомления</h1>
+        {notifications.some(n => !n.is_read) && (
+          <button className="btn btn-primary" onClick={handleMarkAllRead}>
+            Отметить все
+          </button>
+        )}
+      </div>
+
       {notifications.length === 0 ? (
-        <div className="card text-center">Нет уведомлений</div>
+        <div className="card text-center">
+          <p>Нет уведомлений</p>
+        </div>
       ) : (
         notifications.map(n => (
-          <div key={n.id} className={`notification-item ${!n.is_read ? 'unread' : ''}`} onClick={() => !n.is_read && markRead(n.id)}>
+          <div 
+            key={n.id} 
+            className={`notification-item ${!n.is_read ? 'unread' : ''}`} 
+            onClick={() => !n.is_read && handleMarkRead(n.id)}
+          >
             <p>{n.message}</p>
-            <div className="notification-date">{new Date(n.created_at).toLocaleString()}</div>
+            <div className="notification-date">
+              {new Date(n.created_at).toLocaleString('ru-RU')}
+            </div>
           </div>
         ))
       )}
@@ -301,18 +381,20 @@ function Dashboard() {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    async function load() {
-      const data = await apiCall('/tasks/dashboard/');
-      setStats(data);
-    }
-    load();
+    loadDashboard();
   }, []);
+
+  const loadDashboard = async () => {
+    const data = await getDashboard();
+    setStats(data);
+  };
 
   if (!stats) return <div className="container">Загрузка...</div>;
 
   return (
     <div className="container">
-      <h1>Дашборд</h1>
+      <h1 style={{ marginBottom: '30px' }}>Дашборд</h1>
+
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-value">{stats.total_tasks || 0}</div>
@@ -338,6 +420,20 @@ function Dashboard() {
 function App() {
   const [page, setPage] = useState('dashboard');
   const [isAuth, setIsAuth] = useState(!!localStorage.getItem('token'));
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (isAuth) {
+      const loadUnreadCount = async () => {
+        const data = await getNotifications();
+        if (Array.isArray(data)) {
+          const unread = data.filter(n => !n.is_read).length;
+          setUnreadCount(unread);
+        }
+      };
+      loadUnreadCount();
+    }
+  }, [isAuth, page]);
 
   if (!isAuth) {
     if (page === 'register') {
@@ -346,25 +442,48 @@ function App() {
     return <Login onLogin={() => setIsAuth(true)} />;
   }
 
-  let content;
-  if (page === 'tasks') content = <Tasks />;
-  else if (page === 'categories') content = <Categories />;
-  else if (page === 'notifications') content = <Notifications />;
-  else content = <Dashboard />;
-
   return (
     <div>
-      <nav className="navbar">
-        <a href="#" className="navbar-brand" onClick={(e) => { e.preventDefault(); setPage('dashboard'); }}>TimeWise</a>
+      <div className="navbar">
+        <span className="navbar-brand">TimeWise</span>
         <div className="navbar-menu">
-          <a href="#" onClick={(e) => { e.preventDefault(); setPage('dashboard'); }}>Главная</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); setPage('tasks'); }}>Задачи</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); setPage('categories'); }}>Категории</a>
-          <a href="#" onClick={(e) => { e.preventDefault(); setPage('notifications'); }}>Уведомления</a>
-          <button onClick={() => { localStorage.removeItem('token'); setIsAuth(false); }}>Выйти</button>
+          <button 
+            className={page === 'dashboard' ? 'active' : ''}
+            onClick={() => setPage('dashboard')}
+          >
+            Главная
+          </button>
+          <button 
+            className={page === 'tasks' ? 'active' : ''}
+            onClick={() => setPage('tasks')}
+          >
+            Задачи
+          </button>
+          <button 
+            className={page === 'categories' ? 'active' : ''}
+            onClick={() => setPage('categories')}
+          >
+            Категории
+          </button>
+          <button 
+            className={page === 'notifications' ? 'active' : ''}
+            onClick={() => setPage('notifications')}
+          >
+            Уведомления {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
+          </button>
+          <button 
+            style={{ backgroundColor: '#e74c3c' }}
+            onClick={() => { localStorage.removeItem('token'); setIsAuth(false); }}
+          >
+            Выйти
+          </button>
         </div>
-      </nav>
-      {content}
+      </div>
+
+      {page === 'dashboard' && <Dashboard />}
+      {page === 'tasks' && <Tasks />}
+      {page === 'categories' && <Categories />}
+      {page === 'notifications' && <Notifications />}
     </div>
   );
 }

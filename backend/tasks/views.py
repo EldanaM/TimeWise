@@ -8,7 +8,11 @@ from .serializers import (
     CategorySerializer, TaskSerializer, 
     TimeLogSerializer, NotificationSerializer
 )
-from .analytics import NotificationService, AchievementService, AnalysisService  
+from .analytics.notifications import NotificationService
+from .analytics.achievements import AchievementService
+from .analytics.analysis import AnalysisService
+from .analytics.prediction import PredictionService
+
 
 class CategoryViewSet(viewsets.ModelViewSet):
     serializer_class = CategorySerializer
@@ -19,6 +23,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
 
 class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
@@ -62,6 +67,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(task)
         return Response(serializer.data)
 
+
 class TimeLogViewSet(viewsets.ModelViewSet):
     serializer_class = TimeLogSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -76,7 +82,9 @@ class TimeLogViewSet(viewsets.ModelViewSet):
             raise permissions.PermissionDenied('Это не ваша задача')
         
         timelog = serializer.save(user=self.request.user)
+        
         NotificationService.check_time_accuracy(timelog)
+
 
 class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = NotificationSerializer
@@ -121,6 +129,7 @@ class NotificationViewSet(viewsets.ReadOnlyModelViewSet):
             'count': count
         })
 
+
 class DashboardViewSet(viewsets.ViewSet):
     permission_classes = [permissions.IsAuthenticated]
     
@@ -136,8 +145,8 @@ class DashboardViewSet(viewsets.ViewSet):
         )['total'] or 0
         
         category_stats = AnalysisService.get_category_stats(user)
+        
         accuracy = AnalysisService.get_accuracy_rate(user)
-        trends = AnalysisService.get_productivity_trends(user)
         
         unread_notifications = Notification.objects.filter(
             user=user, is_read=False
@@ -147,11 +156,10 @@ class DashboardViewSet(viewsets.ViewSet):
             'total_tasks': total_tasks,
             'completed_tasks': completed_tasks,
             'active_tasks': active_tasks,
-            'completion_rate': round(completed_tasks/total_tasks*100) if total_tasks else 0,
+            'completion_rate': round(completed_tasks/total_tasks*100) if total_tasks > 0 else 0,
             'total_focus_time': total_time,
             'total_focus_time_hours': round(total_time / 60, 1),
             'category_stats': category_stats,
             'accuracy': accuracy,
-            'trends': trends,
             'unread_notifications': unread_notifications
         })

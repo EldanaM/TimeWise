@@ -1,5 +1,6 @@
 from django.db.models import Sum
 from ..models import Notification, Task, TimeLog
+from .email_service import EmailService
 
 class AchievementService:
     @staticmethod
@@ -39,3 +40,4 @@ class AchievementService:
                 message=f'{ach["icon"]} {ach["title"]}!\n\n{ach["message"]}',
                 type='success'
             )
+            EmailService.achievement_notification(user, ach)

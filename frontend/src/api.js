@@ -1,71 +1,74 @@
-import axios from 'axios';
+const API_URL = 'http://127.0.0.1:8000/api';
 
-const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/',
-  headers: {
-    'Content-Type': 'application/json',
-  }
-});
-
-api.interceptors.request.use((config) => {
+async function apiCall(url, method = 'GET', data = null) {
+  const options = {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  };
+  
   const token = localStorage.getItem('token');
   if (token) {
-    config.headers.Authorization = `Token ${token}`;
+    options.headers.Authorization = `Token ${token}`;
   }
-  return config;
-});
-
-export const register = (username, email, password, password2) => 
-  api.post('users/register/', { username, email, password, password2 });
+  
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+  
+  try {
+    const response = await fetch(API_URL + url, options);
+    return await response.json();
+  } catch (error) {
+    console.error('API Error:', error);
+    return null;
+  }
+}
 
 export const login = (username, password) => 
-  api.post('users/login/', { username, password });
+  apiCall('/users/login/', 'POST', { username, password });
 
-export const getCurrentUser = () => 
-  api.get('users/me/');
+export const register = (username, email, password, password2) => 
+  apiCall('/users/register/', 'POST', { username, email, password, password2 });
 
 export const getCategories = () => 
-  api.get('tasks/categories/');
+  apiCall('/tasks/categories/');
 
-export const createCategory = (name, color) => 
-  api.post('tasks/categories/', { name, color });
+export const createCategory = (name, color = '#4a90e2') => 
+  apiCall('/tasks/categories/', 'POST', { name, color });
 
 export const deleteCategory = (id) => 
-  api.delete(`tasks/categories/${id}/`);
+  apiCall(`/tasks/categories/${id}/`, 'DELETE');
 
 export const getTasks = (status = '', category = '') => {
-  let url = 'tasks/tasks/';
+  let url = '/tasks/tasks/';
   const params = [];
   if (status) params.push(`status=${status}`);
   if (category) params.push(`category=${category}`);
   if (params.length) url += '?' + params.join('&');
-  return api.get(url);
+  return apiCall(url);
 };
 
-export const createTask = (data) => 
-  api.post('tasks/tasks/', data);
-
-export const updateTask = (id, data) => 
-  api.put(`tasks/tasks/${id}/`, data);
+export const createTask = (taskData) => 
+  apiCall('/tasks/tasks/', 'POST', taskData);
 
 export const deleteTask = (id) => 
-  api.delete(`tasks/tasks/${id}/`);
+  apiCall(`/tasks/tasks/${id}/`, 'DELETE');
 
 export const completeTask = (id) => 
-  api.post(`tasks/tasks/${id}/complete/`, {});
+  apiCall(`/tasks/tasks/${id}/complete/`, 'POST', {});
 
-export const createTimeLog = (taskId, actualTime) => 
-  api.post('tasks/time-logs/', { task: taskId, actual_time: actualTime });
-
-  api.get('tasks/notifications/');
+export const getNotifications = () => 
+  apiCall('/tasks/notifications/');
 
 export const markNotificationRead = (id) => 
-  api.post(`tasks/notifications/${id}/mark-read/`, {});
+  apiCall(`/tasks/notifications/${id}/mark-read/`, 'POST', {});
 
 export const markAllNotificationsRead = () => 
-  api.post('tasks/notifications/mark-all-read/', {});
+  apiCall('/tasks/notifications/mark-all-read/', 'POST', {});
 
 export const getDashboard = () => 
-  api.get('tasks/dashboard/');
+  apiCall('/tasks/dashboard/');
 
-export default api;
+export default apiCall;
