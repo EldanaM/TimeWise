@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  login, register, getTasks, getCategories, createTask, deleteTask, completeTask,
+  login, register, getTasks, getCategories, createTask, deleteTask, completeTask, createTimeLog,
   createCategory, deleteCategory, getNotifications, markNotificationRead, 
   markAllNotificationsRead, getDashboard 
 } from './api';
@@ -155,7 +155,17 @@ function Tasks() {
   };
 
   const handleCompleteTask = async (id) => {
+    const time = prompt('Сколько минут заняло выполнение задачи?', '30');
+    if (time === null) return;
+    
+    const minutes = parseInt(time);
+    if (isNaN(minutes) || minutes <= 0) {
+      alert('Введите положительное число');
+      return;
+    }
+    
     await completeTask(id);
+    await createTimeLog(id, minutes);
     loadData();
   };
 
@@ -472,7 +482,7 @@ function App() {
             Уведомления {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
           </button>
           <button 
-            style={{ backgroundColor: '#e74c3c' }}
+            style={{ backgroundColor: '#dc3545' }}
             onClick={() => { localStorage.removeItem('token'); setIsAuth(false); }}
           >
             Выйти

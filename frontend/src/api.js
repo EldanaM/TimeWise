@@ -59,6 +59,9 @@ export const deleteTask = (id) =>
 export const completeTask = (id) => 
   apiCall(`/tasks/tasks/${id}/complete/`, 'POST', {});
 
+export const createTimeLog = (taskId, actualTime) => 
+  apiCall('/tasks/time-logs/', 'POST', { task: taskId, actual_time: actualTime });
+
 export const getNotifications = () => 
   apiCall('/tasks/notifications/');
 
